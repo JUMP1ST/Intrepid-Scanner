@@ -1,4 +1,4 @@
-# Use Ubuntu as the base image for a more flexible environment
+# Use Ubuntu 22.04 as the base image for a stable environment
 FROM ubuntu:22.04 AS builder
 
 # Set environment variables
@@ -27,12 +27,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tar \
     yara \
     clamav \
+    clamav-daemon \
     build-essential \
     libssl-dev \
     libffi-dev \
     file \
     gcc \
-    clamav-daemon \
     docker.io && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
@@ -88,8 +88,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     python3-venv \
     libmagic1 \
-    && apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    clamav \
+    clamav-daemon \
+    docker.io && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* && \
+    freshclam
 
 # Copy the virtual environment, Docker CLI, and application code from the builder stage
 COPY --from=builder /app /app
@@ -109,3 +113,4 @@ EXPOSE 5000
 
 # Correct the CMD to explicitly run app.py using Python
 CMD ["python3", "/app/app.py"]
+
