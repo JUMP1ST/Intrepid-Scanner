@@ -2,7 +2,7 @@ import os
 import json
 import subprocess
 import logging
-import magic  
+import magic
 import tarfile
 import shutil
 import tempfile
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 # Configurable folders via environment variables with fallbacks to default temporary directories
 UPLOAD_FOLDER = os.getenv('UPLOAD_FOLDER', tempfile.mkdtemp())
 SCAN_RESULTS_FOLDER = os.getenv('SCAN_RESULTS_FOLDER', tempfile.mkdtemp())
-YARA_RULES_PATH = os.getenv('YARA_RULES_PATH', '/opt/yara/malware_index.yar')  # Update with the correct path or use environment variable
+YARA_RULES_PATH = os.getenv('YARA_RULES_PATH', '/opt/yara/malware_index.yar')
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -287,43 +287,28 @@ def detect_file_type(file_path):
         logger.error("libmagic not initialized.")
         return "libmagic not available"
 
-def format_scan_result(result, scan_type):
-    """Ensure each result has 'path', 'scan_type', 'severity', and 'details'."""
-    if result is None:
-        logger.error("Received NoneType in scan results.")
-        return {
-            'path': 'Unknown path',
-            'scan_type': scan_type,
-            'severity': 'unknown',
-            'details': 'No data available'
-        }
-
-    if isinstance(result, dict):
-        # Ensure all expected fields are present
-        return {
-            'path': result.get('path', 'Unknown path'),
-            'scan_type': result.get('scan_type', scan_type),
-            'severity': result.get('severity', 'unknown'),
-            'details': result.get('details', 'No details provided')
-        }
-    elif isinstance(result, list):
-        # Recursively format each item in the list
-        return [format_scan_result(item, scan_type) for item in result]
-    elif isinstance(result, str):
-        return {
-            'path': 'Unknown path',
-            'scan_type': scan_type,
-            'severity': 'unknown',
-            'details': result
-        }
-    else:
-        logger.error(f"Unexpected result type: {type(result)}")
-        return {
-            'path': 'Unknown path',
-            'scan_type': scan_type,
-            'severity': 'error',
-            'details': 'Unexpected result type'
-        }
+def format_scan_results(results):
+    """Formats the scan results into a readable format for the UI."""
+    formatted_results = []
+    for result in results:
+        if isinstance(result, dict):
+            formatted_result = {
+                'path': result.get('path', 'Unknown path'),
+                'scan_type': result.get('scan_type', 'Unknown scan type'),
+                'severity': result.get('severity', 'unknown'),
+                'details': result.get('details', 'No details available')
+            }
+            formatted_results.append(formatted_result)
+        elif isinstance(result, list):
+            formatted_results.extend(format_scan_results(result))
+        else:
+            formatted_results.append({
+                'path': 'Unknown path',
+                'scan_type': 'Unknown scan type',
+                'severity': 'error',
+                'details': str(result)
+            })
+    return formatted_results
 
 def perform_scan_tasks(scan_tasks):
     """Execute scan tasks in parallel and collect results."""
@@ -349,6 +334,7 @@ def index():
         files = request.files.getlist('file')
         scan_results = []  # Initialize scan_results
 
+        # Handle File System Scan
         if scan_type == 'filesystem':
             for file in files:
                 filename = secure_filename(file.filename)
@@ -374,14 +360,15 @@ def index():
 
                 # Perform the filesystem scan
                 full_scan_result = run_trivy_fs_scan(file_path)
-                scan_results.append(format_scan_result(full_scan_result, 'filesystem'))
+                scan_results.append(format_scan_results([full_scan_result]))
+                scan_results.extend(run_clamav_scan(file_path))  # Include ClamAV scan
 
+        # Handle Git Repository Scan
         if scan_type == 'git' and git_repo_url:
-            # Correct function call and handle output
             try:
                 logger.info(f"Running Trivy remote Git scan on: {git_repo_url}")
                 trivy_repo_result = run_trivy_repo_scan(git_repo_url)
-                scan_results.append(format_scan_result(trivy_repo_result, 'git'))
+                scan_results.append(format_scan_results([trivy_repo_result]))
                 logger.info(f"Git repository scan completed for: {git_repo_url}")
             except Exception as e:
                 scan_results.append({'error': f"Error running Trivy Git scan: {e}"})
@@ -393,11 +380,11 @@ def index():
                 scan_results.append(run_yara_scan(clone_path))  # Include YARA scan
                 trivy_scan_result = run_trivy_scan(['trivy', 'fs', clone_path, '--format', 'json'],
                                                    os.path.join(app.config['SCAN_RESULTS_FOLDER'], 'trivy_fs_scan.json'))
-                scan_results.append(format_scan_result(trivy_scan_result, 'filesystem'))
+                scan_results.append(format_scan_results([trivy_scan_result]))
                 shutil.rmtree(clone_path)  # Clean up after scanning
 
+        # Handle Docker Image Scan
         elif scan_type == 'image' and image_name:
-            # Define scan tasks for image scans
             scan_tasks = [
                 lambda: run_trivy_image_scan(image_name),
                 lambda: run_grype_image_scan(image_name),
@@ -412,12 +399,7 @@ def index():
             scan_results.extend(perform_scan_tasks(scan_tasks))
 
         # Format scan results consistently
-        formatted_results = []
-        for result in scan_results:
-            if isinstance(result, list):
-                formatted_results.extend([format_scan_result(item, scan_type) for item in result])
-            else:
-                formatted_results.append(format_scan_result(result, scan_type))
+        formatted_results = format_scan_results(scan_results)
 
         # Ensure scan results are passed to the template
         return render_template('index.html', scan_results=formatted_results)
@@ -439,3 +421,4 @@ def download_files():
 if __name__ == "__main__":
     logger.info("Starting Flask application on http://0.0.0.0:5000")
     app.run(host='0.0.0.0', port=5000)
+
