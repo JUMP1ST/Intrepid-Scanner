@@ -57,7 +57,7 @@ Installation
 Clone the Repository
 Clone the repository to your local machine:
 
-git clone <your-repository-url>
+git clone git@github.com:JUMP1ST/Sec-Scanner-ubuntu.git
 cd <your-repository-folder>
 
 Build Docker Image
@@ -69,8 +69,6 @@ docker build -t security-scanner .
 Run the Docker Container
 Run the container and expose it on port 5000:
 
-bash
-Copy code
 docker run -d -p 5000:5000 security-scanner
 This will start the Flask application, and you can access it in your browser at http://localhost:5000.
 
@@ -85,9 +83,8 @@ YARA_RULES_PATH: Path to the YARA rules file. Default is /opt/yara/malware_index
 Example: /opt/yara/custom_rules.yar
 You can pass these variables to Docker using the -e flag:
 
-bash
-Copy code
-docker run -d -p 5000:5000 -e UPLOAD_FOLDER=/app/uploads -e SCAN_RESULTS_FOLDER=/app/output/scan-results security-scanner
+docker run -d -p 5000:5000 -e UPLOAD_FOLDER=/app/uploads -e SCAN_RESULTS_FOLDER=/app/output/scan-results security-scanner 
+
 Example Usage
 File Upload: Upload a file through the web interface to trigger a filesystem scan using Trivy, YARA, and ClamAV.
 Docker Image Scan: Enter a Docker image name in the web interface to scan it with Trivy, Grype, and ClamAV.
