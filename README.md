@@ -8,6 +8,7 @@
 
 
 Overview
+
 The Security-Scanner is a versatile application that scans files, Docker images, and Git repositories for potential vulnerabilities, malware, and viruses. It leverages several industry-standard tools, including:
 
 Trivy: Vulnerability scanner for container images and filesystems.
@@ -17,28 +18,31 @@ ClamAV: Antivirus engine for scanning files and directories.
 The application is built with Flask as the web interface and designed to run in a containerized environment using Docker.
 
 Features
+
 File Upload Scan: Scan uploaded files for vulnerabilities and malware.
 Docker Image Scan: Scan Docker images for vulnerabilities using multiple scanners.
 Git Repository Scan: Clone and scan Git repositories for vulnerabilities and malware.
 Review Mechanism: Flag potentially harmful files for manual review.
 Parallel Scanning: Executes scans in parallel for efficiency.
+
 Prerequisites
+
 Docker installed on the system.
 Python 3.6+ (for running without Docker).
 Docker and Docker Compose (Best).
 
 Installation
-Clone the Repository
-Clone the repository to your local machine:
 
+Clone the Repository
+
+Clone the repository to your local machine:
 git clone git@github.com:JUMP1ST/Sec-Scanner-ubuntu.git
 cd <your-repository-folder>
 
 Build Docker Image
+
 To build the Docker image for the Security-Scanner application, use the following command:
 
-bash
-Copy code
 docker build -t security-scanner .
 Run the Docker Container
 Run the container and expose it on port 5000:
@@ -60,6 +64,7 @@ You can pass these variables to Docker using the -e flag:
 docker run -d -p 5000:5000 -e UPLOAD_FOLDER=/app/uploads -e SCAN_RESULTS_FOLDER=/app/output/scan-results security-scanner 
 
 Example Usage
+
 File Upload: Upload a file through the web interface to trigger a filesystem scan using Trivy, YARA, and ClamAV.
 Docker Image Scan: Enter a Docker image name in the web interface to scan it with Trivy, Grype, and ClamAV.
 Git Repository Scan: Provide a Git repository URL to clone and scan it using Trivy and YARA.
