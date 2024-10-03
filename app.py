@@ -6,7 +6,7 @@ import magic
 import tarfile
 import shutil
 import tempfile
-from flask import Flask, jsonify, request, render_template, send_from_directory, abort
+from flask import Flask, jsonify, request, render_template, send_from_directory, abort, redirect, url_for
 from werkzeug.utils import secure_filename
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -24,6 +24,9 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['SCAN_RESULTS_FOLDER'] = SCAN_RESULTS_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024 * 1024  # 5GB max file size
 app.secret_key = 'supersecretkey'  # Set a secure key for sessions
+
+# Track scan status
+scan_completed = False # Variable to track if a scan has been completed
 
 # Ensure necessary directories exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -342,13 +345,16 @@ def perform_scan_tasks(scan_tasks):
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
+    global scan_completed  # Use the global scan_completed to track status
+    scan_results = []
+
     if request.method == 'POST':
         scan_type = request.form.get('scan_type')
         image_name = request.form.get('image_name')
         git_repo_url = request.form.get('git_url')
         files = request.files.getlist('file')
-        scan_results = []  # Initialize scan_results
 
+        # Process filesystem scan
         if scan_type == 'filesystem':
             for file in files:
                 filename = secure_filename(file.filename)
@@ -376,8 +382,8 @@ def index():
                 full_scan_result = run_trivy_fs_scan(file_path)
                 scan_results.append(format_scan_result(full_scan_result, 'filesystem'))
 
+        # Process Git repository scan
         if scan_type == 'git' and git_repo_url:
-            # Correct function call and handle output
             try:
                 logger.info(f"Running Trivy remote Git scan on: {git_repo_url}")
                 trivy_repo_result = run_trivy_repo_scan(git_repo_url)
@@ -389,15 +395,17 @@ def index():
             # Clone the repo and run further scans
             clone_path = os.path.join(app.config['UPLOAD_FOLDER'], 'cloned_repo')
             if clone_git_repo(git_repo_url, clone_path):
-                scan_results.extend(run_clamav_scan(clone_path))  # Correctly handles directories now
-                scan_results.append(run_yara_scan(clone_path))  # Include YARA scan
-                trivy_scan_result = run_trivy_scan(['trivy', 'fs', clone_path, '--format', 'json'],
-                                                   os.path.join(app.config['SCAN_RESULTS_FOLDER'], 'trivy_fs_scan.json'))
+                scan_results.extend(run_clamav_scan(clone_path))
+                scan_results.append(run_yara_scan(clone_path))
+                trivy_scan_result = run_trivy_scan(
+                    ['trivy', 'fs', clone_path, '--format', 'json'],
+                    os.path.join(app.config['SCAN_RESULTS_FOLDER'], 'trivy_fs_scan.json')
+                )
                 scan_results.append(format_scan_result(trivy_scan_result, 'filesystem'))
-                shutil.rmtree(clone_path)  # Clean up after scanning
+                shutil.rmtree(clone_path)
 
+        # Process image scan
         elif scan_type == 'image' and image_name:
-            # Define scan tasks for image scans
             scan_tasks = [
                 lambda: run_trivy_image_scan(image_name),
                 lambda: run_grype_image_scan(image_name),
@@ -408,10 +416,9 @@ def index():
             if os.path.exists(clamav_path):
                 scan_tasks.append(lambda: run_clamav_scan(clamav_path))
 
-            # Run scans in parallel
             scan_results.extend(perform_scan_tasks(scan_tasks))
 
-        # Format scan results consistently
+        # Format and pass scan results to template
         formatted_results = []
         for result in scan_results:
             if isinstance(result, list):
@@ -419,10 +426,12 @@ def index():
             else:
                 formatted_results.append(format_scan_result(result, scan_type))
 
-        # Ensure scan results are passed to the template
-        return render_template('index.html', scan_results=formatted_results)
+        # Set scan_completed to True after processing all scans
+        scan_completed = True
+        logger.info("Scan completed; redirecting to review page.")
+        return redirect(url_for('review'))
 
-    return render_template('index.html')
+    return render_template('index.html', scan_completed=scan_completed)
 
 @app.route('/download/<filename>')
 def download_file(filename):
@@ -435,6 +444,14 @@ def download_files():
     """List available files for download."""
     files = os.listdir(app.config['UPLOAD_FOLDER'])
     return render_template('download.html', files=files)
+
+@app.route('/scan-status')
+def scan_status():
+    """Check the status of scans and findings."""
+    review_data = get_review_data()  # Retrieve the current review data
+    findings_exist = len(review_data) > 0  # Check if there are any findings from the scan
+    return jsonify({'scan_completed': scan_completed, 'findings_exist': findings_exist})
+
 
 if __name__ == "__main__":
     logger.info("Starting Flask application on http://0.0.0.0:5000")

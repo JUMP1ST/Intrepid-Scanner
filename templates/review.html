@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heimdall Scanner - Review</title>
+
+    <!-- Bootstrap CSS (local) -->
+    <link rel="stylesheet" href="../static/bootstrap.min.css">
+
+    <!-- Bootstrap Icons (local) -->
+    <link rel="stylesheet" href="../static/bootstrap-icons.css">
+
+    <!-- Custom CSS for styling (local) -->
+    <link rel="stylesheet" href="../static/style.css">
+</head>
+<body class="light-mode">
+    <!-- Header Bar -->
+    <header class="header-bar">
+        <div class="container d-flex justify-content-between align-items-center">
+            <!-- Left Side: Logo and Search -->
+            <div class="header-left d-flex align-items-center">
+                <img src="../static/images/tool-icon.png" alt="Tool Icon" class="logo">
+                <input type="search" class="form-control search-bar" placeholder="Search URL, file system, image, git repository">
+            </div>
+
+            <!-- Right Side: Notifications, Support, and Theme Switch -->
+            <div class="header-right d-flex align-items-center">
+                <button class="btn btn-link"><i class="alert-icon bi bi-bell"></i></button> <!-- Notification Icon -->
+                <button class="btn btn-link"><i class="bi bi-question-circle"></i> Support</button> <!-- Support -->
+                <button class="btn btn-link theme-toggle" id="themeToggle"><i class="bi bi-sun"></i></button> <!-- Light/Dark Mode Toggle -->
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content for Review -->
+    <main class="main-content">
+        <div class="container text-center mt-5">
+            <!-- Tool Title for Scan Results -->
+            <h2>Scan Results</h2>
+            <p>Your scan results will be displayed here.</p>
+            <!-- Placeholder for actual scan results to be dynamically added -->
+            <div id="scan-results">
+                <p>No scan results available.</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Bootstrap JS (local) -->
+    <script src="../static/bootstrap.bundle.min.js"></script>
+
+    <!-- Custom JS for handling tabs and theme toggle (local) -->
+    <script src="../static/script.js"></script>
+</body>
+</html>
