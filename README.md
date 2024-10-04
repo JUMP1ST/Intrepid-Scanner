@@ -82,3 +82,23 @@ Sec-scanner/
     ├── trivy_fs_scan.json          # Example scan result for Trivy filesystem scan
     ├── trivy_image_scan.json       # Example scan result for Trivy image scan
     └── review.json                 # JSON file storing review data
+
+Usage Instructions
+1. Performing a Scan
+File System Scan: Upload files from your system to analyze them for potential threats.
+Git Repository Scan: Enter a valid Git URL (e.g., https://github.com/user/repo.git) to scan the repository's contents.
+Container Image Scan: Provide the name of a Docker image to run a security scan for vulnerabilities.
+2. Reviewing Scan Results
+After a scan is initiated, the application automatically redirects to a review page where the scan results are displayed.
+Users can revisit the review page by clicking the "View Scan Results" button on the main page if the scan has already been completed.
+3. Real-Time Alerts
+An alert icon is present at the top of the page to notify users when scans are completed or if findings require attention.
+The icon will change color and animate when a new alert is available, ensuring users are aware of any important updates.
+Contributing
+To contribute to this project:
+
+Fork the repository.
+Create a new feature branch (git checkout -b feature/new-feature).
+Commit your changes (git commit -m 'Add new feature').
+Push the branch to your fork (git push origin feature/new-feature).
+Submit a pull request.
