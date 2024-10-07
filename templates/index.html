@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="../static/bootstrap-icons.css">
 
     <!-- Custom CSS for styling (local) -->
-    <link rel="stylesheet" href="../static/style.css">
+    <link rel="stylesheet" href="../static/css/style.css">
 </head>
 <body class="light-mode">
     <!-- Header Bar -->
@@ -79,6 +79,38 @@
                         </div>
                         <button type="submit" class="btn btn-primary w-100">Scan</button>
                     </form>
+
+                    <!-- Detailed Scan Results Section -->
+                    {% if file_scan_results %}
+                    <div class="card-footer mt-4">
+                        <h3 class="text-center">Scan Results:</h3>
+                        <table class="table table-hover scan-results-table">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>File/URL</th>
+                                    <th>Type</th>
+                                    <th>Severity</th>
+                                    <th>Details</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for result in file_scan_results %}
+                                <tr class="{% if 'critical' in result.severity|lower %}table-danger{% elif 'warning' in result.severity|lower %}table-warning{% else %}table-success{% endif %}">
+                                    <td>{{ result.path }}</td>
+                                    <td>{{ result.scan_type }}</td>
+                                    <td>{{ result.severity }}</td>
+                                    <td><button class="btn btn-link" data-bs-toggle="collapse" data-bs-target="#details-{{ loop.index }}">View Details</button></td>
+                                </tr>
+                                <tr id="details-{{ loop.index }}" class="collapse">
+                                    <td colspan="4"><pre>{{ result.details }}</pre></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="mt-4">No scan results available.</p>
+                    {% endif %}                    
                 </div>
             </div>
 
@@ -92,6 +124,38 @@
                         </div>
                         <button type="submit" class="btn btn-primary w-100">Scan</button>
                     </form>
+
+                    <!-- Detailed Scan Results Section -->
+                    {% if image_scan_results %}
+                    <div class="card-footer mt-4">
+                        <h3 class="text-center">Scan Results:</h3>
+                        <table class="table table-hover scan-results-table">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Image</th>
+                                    <th>Type</th>
+                                    <th>Severity</th>
+                                    <th>Details</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for result in image_scan_results %}
+                                <tr class="{% if 'critical' in result.severity|lower %}table-danger{% elif 'warning' in result.severity|lower %}table-warning{% else %}table-success{% endif %}">
+                                    <td>{{ result.path }}</td>
+                                    <td>{{ result.scan_type }}</td>
+                                    <td>{{ result.severity }}</td>
+                                    <td><button class="btn btn-link" data-bs-toggle="collapse" data-bs-target="#details-{{ loop.index }}">View Details</button></td>
+                                </tr>
+                                <tr id="details-{{ loop.index }}" class="collapse">
+                                    <td colspan="4"><pre>{{ result.details }}</pre></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="mt-4">No scan results available.</p>
+                    {% endif %}                    
                 </div>
             </div>
 
@@ -105,6 +169,38 @@
                         </div>
                         <button type="submit" class="btn btn-primary w-100">Scan</button>
                     </form>
+
+                    <!-- Detailed Scan Results Section -->
+                    {% if git_scan_results %}
+                    <div class="card-footer mt-4">
+                        <h3 class="text-center">Scan Results:</h3>
+                        <table class="table table-hover scan-results-table">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Repository</th>
+                                    <th>Type</th>
+                                    <th>Severity</th>
+                                    <th>Details</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for result in git_scan_results %}
+                                <tr class="{% if 'critical' in result.severity|lower %}table-danger{% elif 'warning' in result.severity|lower %}table-warning{% else %}table-success{% endif %}">
+                                    <td>{{ result.path }}</td>
+                                    <td>{{ result.scan_type }}</td>
+                                    <td>{{ result.severity }}</td>
+                                    <td><button class="btn btn-link" data-bs-toggle="collapse" data-bs-target="#details-{{ loop.index }}">View Details</button></td>
+                                </tr>
+                                <tr id="details-{{ loop.index }}" class="collapse">
+                                    <td colspan="4"><pre>{{ result.details }}</pre></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="mt-4">No scan results available.</p>
+                    {% endif %}
                 </div>
             </div>
         </div>

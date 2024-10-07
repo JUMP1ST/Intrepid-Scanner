@@ -1,0 +1,96 @@
+/* Main Content */
+.main-content {
+    padding: 50px 0;
+    text-align: center;
+}
+
+.tool-logo {
+    width: 150px;
+    margin-bottom: 20px;
+}
+
+.tool-title {
+    font-size: 2.5em;
+    margin-bottom: 10px;
+}
+
+.tool-description {
+    font-size: 1.2em;
+    color: #555;
+}
+
+/* Tab Link Section */
+.link-section {
+    margin-top: 30px;
+}
+
+.tab-links {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+}
+
+.tab-link {
+    padding: 10px 20px;
+    font-size: 1.1em;
+    color: #333;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.tab-link:hover {
+    text-decoration: underline;
+}
+
+.tab-separator {
+    height: 2px;
+    background-color: #ddd;
+    margin: 10px 0;
+}
+
+.tab-underline {
+    width: 100px;
+    height: 4px;
+    background-color: #007bff;
+    margin: auto;
+}
+
+/* Form Sections */
+.form-sections {
+    padding: 30px 0;
+}
+
+.tab-content {
+    display: none;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 10px;
+    box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Form Inputs */
+.form-label {
+    font-weight: bold;
+}
+
+.form-control {
+    border-radius: 5px;
+}
+
+/* Scan Results Table */
+.scan-results-table {
+    margin-top: 30px;
+    width: 100%;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .tab-links {
+        flex-direction: column;
+        gap: 15px;
+    }
+}

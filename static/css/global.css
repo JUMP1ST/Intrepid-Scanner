@@ -1,0 +1,111 @@
+/* Global Theme Styles */
+body {
+    transition: background-color 0.3s, color 0.3s;
+}
+
+.light-mode {
+    background-color: #ffffff;
+    color: #000;
+}
+
+.heimdall-mode {
+    background-color: #003366;
+    color: #fff;
+}
+
+.dark-mode {
+    background-color: #121212;
+    color: #e0e0e0;
+}
+
+/* Header Styling */
+.header-bar {
+    padding: 15px;
+    background-color: #333;
+    color: #fff;
+    box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+}
+
+.header-left .logo {
+    width: 50px;
+    margin-right: 15px;
+}
+
+.search-bar {
+    width: 300px;
+    max-width: 100%;
+    margin-right: 15px;
+}
+
+/* Notification and Theme Toggle */
+.header-right .btn-link {
+    color: #fff;
+    margin-left: 10px;
+}
+
+.header-right .btn-link:hover {
+    color: #ddd;
+}
+
+/* Buttons */
+.btn-primary {
+    background-color: #007bff;
+    border-color: #007bff;
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+    background-color: #0056b3;
+    border-color: #0056b3;
+}
+
+.btn-link {
+    color: #007bff;
+    cursor: pointer;
+}
+
+.btn-link:hover {
+    text-decoration: underline;
+}
+
+/* Table Styles */
+.table-danger {
+    background-color: #f8d7da;
+}
+
+.table-warning {
+    background-color: #fff3cd;
+}
+
+.table-success {
+    background-color: #d4edda;
+}
+
+.scan-results-table {
+    margin-top: 20px;
+    width: 100%;
+}
+
+/* Card Footer for Scan Results */
+.card-footer {
+    padding: 20px;
+    margin-top: 20px;
+    background-color: #f1f1f1;
+    border-radius: 8px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .header-left .search-bar {
+        width: 200px;
+    }
+
+    .header-right {
+        margin-top: 10px;
+    }
+}

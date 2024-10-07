@@ -3,19 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Heimdall Scanner - Review</title>
+    <title>Review Flagged Scans</title>
 
     <!-- Bootstrap CSS (local) -->
     <link rel="stylesheet" href="../static/bootstrap.min.css">
 
-    <!-- Bootstrap Icons (local) -->
-    <link rel="stylesheet" href="../static/bootstrap-icons.css">
+    <!-- Global Styles (local) -->
+    <link rel="stylesheet" href="../static/css/global.css">
 
-    <!-- Custom CSS for styling (local) -->
-    <link rel="stylesheet" href="../static/style.css">
+    <!-- Review Page Specific Styles (local) -->
+    <link rel="stylesheet" href="../static/css/review.css">
 </head>
 <body class="light-mode">
-    <!-- Header Bar -->
+
+    <!-- Header Bar (Consistent with index.html) -->
     <header class="header-bar">
         <div class="container d-flex justify-content-between align-items-center">
             <!-- Left Side: Logo and Search -->
@@ -33,15 +34,50 @@
         </div>
     </header>
 
-    <!-- Main Content for Review -->
-    <main class="main-content">
+    <!-- Main Content -->
+    <main class="review-container">
         <div class="container text-center mt-5">
-            <!-- Tool Title for Scan Results -->
-            <h2>Scan Results</h2>
-            <p>Your scan results will be displayed here.</p>
-            <!-- Placeholder for actual scan results to be dynamically added -->
-            <div id="scan-results">
-                <p>No scan results available.</p>
+            <!-- Tool Logo and Title (Optional: Adjust if needed) -->
+            <img src="../static/images/tool-logo.png" alt="Tool Logo" class="tool-logo mb-3">
+            <h1 class="tool-title mb-3">Review Flagged Scans</h1>
+            <p class="tool-description">Review scans flagged for potential issues.</p>
+        </div>
+
+        <!-- Review Data Section -->
+        <div class="container">
+            <div class="review-card">
+                {% if review_data %}
+                <table class="table table-hover scan-results-table">
+                    <thead>
+                        <tr>
+                            <th>File/URL</th>
+                            <th>Type</th>
+                            <th>Status</th>
+                            <th>Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entry in review_data %}
+                        <tr class="{% if 'critical' in entry.status|lower %}table-danger{% elif 'warning' in entry.status|lower %}table-warning{% else %}table-success{% endif %}">
+                            <td>{{ entry.path }}</td>
+                            <td>{{ entry.scan_type }}</td>
+                            <td>{{ entry.status }}</td>
+                            <td><button class="btn btn-link" data-bs-toggle="collapse" data-bs-target="#details-{{ loop.index }}">View Details</button></td>
+                        </tr>
+                        <tr id="details-{{ loop.index }}" class="collapse">
+                            <td colspan="4">
+                                <div class="table-details">
+                                    <h5>Details:</h5>
+                                    <pre>{{ entry.details }}</pre>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p class="text-center">No flagged scans for review.</p>
+                {% endif %}
             </div>
         </div>
     </main>
@@ -49,7 +85,14 @@
     <!-- Bootstrap JS (local) -->
     <script src="../static/bootstrap.bundle.min.js"></script>
 
-    <!-- Custom JS for handling tabs and theme toggle (local) -->
+    <!-- Custom JS for handling theme toggle (local) -->
     <script src="../static/script.js"></script>
+    <script>
+        // Toggle theme between light, heimdall, and dark modes
+        const themeToggle = document.getElementById('themeToggle');
+        themeToggle.addEventListener('change', function() {
+            document.body.className = themeToggle.value + '-mode';
+        });
+    </script>
 </body>
 </html>
