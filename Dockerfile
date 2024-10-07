@@ -61,9 +61,12 @@ RUN mkdir -p /opt/yara && \
 RUN chown -R root:root /app
 
 # Copy the application code and static files
-COPY app.py ./
+COPY app.py ./ 
+COPY scanners/ ./scanners/   
+COPY review_manager/ ./review_manager/    
 COPY templates/ ./templates/
 COPY static/ ./static/
+
 
 # Stage 2: Production stage using the same Ubuntu base image
 FROM ubuntu:22.04
