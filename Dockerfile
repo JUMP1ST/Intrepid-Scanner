@@ -27,19 +27,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tar \
     yara \
     clamav \
+    clamav-daemon \
     build-essential \
     libssl-dev \
     libffi-dev \
     file \
     gcc \
-    clamav-daemon \
     docker.io && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
     freshclam
 
+# Create symbolic link for clamscan if not available in PATH
+RUN ln -s /usr/bin/clamscan /usr/local/bin/clamscan
+
 # Explicitly create necessary directories
-RUN mkdir -p /app/uploads /app/output/scan-results
+RUN mkdir -p /app/uploads /app/output/scan-results /opt/yara
 
 # Copy requirements.txt and install dependencies
 COPY requirements.txt ./
@@ -54,8 +57,7 @@ RUN curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/
 RUN curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
 
 # Install YARA rules
-RUN mkdir -p /opt/yara && \
-    curl -o /opt/yara/malware_index.yar https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/malware_index.yar
+RUN curl -o /opt/yara/malware_index.yar https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/malware_index.yar
 
 # Set permissions for /app directories
 RUN chown -R root:root /app
@@ -67,12 +69,11 @@ COPY review_manager/ ./review_manager/
 COPY templates/ ./templates/
 COPY static/ ./static/
 
-
 # Stage 2: Production stage using the same Ubuntu base image
 FROM ubuntu:22.04
 
 # Ensure output and upload directories exist
-RUN mkdir -p /app/output /app/uploads /app/output/scan-results && \
+RUN mkdir -p /app/output /app/uploads /app/output/scan-results /opt/yara && \
     chown -R root:root /app
 
 # Set environment variables
@@ -86,13 +87,20 @@ ENV PATH="/app/venv/bin:$PATH" \
 # Ensure the production stage uses the root user
 USER root
 
-# Install Python and essential tools in the production stage
+# Install Python, git, and essential tools in the production stage
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     python3-venv \
     libmagic1 \
-    && apt-get clean && \
+    yara \
+    clamav \
+    clamav-daemon \
+    git && \
+    apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+
+# Create symbolic link for clamscan in production stage if not available in PATH
+RUN ln -s /usr/bin/clamscan /usr/local/bin/clamscan
 
 # Copy the virtual environment, Docker CLI, and application code from the builder stage
 COPY --from=builder /app /app

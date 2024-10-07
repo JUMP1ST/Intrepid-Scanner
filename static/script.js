@@ -36,7 +36,6 @@ contents[0].classList.add('active');
 underline.style.width = `${tabs[0].offsetWidth}px`;
 underline.style.transform = `translateX(${tabs[0].offsetLeft}px)`;
 
-
 // Function to check scan status and findings
 function checkScanAndAlert() {
     fetch('/scan-status')
@@ -47,7 +46,11 @@ function checkScanAndAlert() {
             // Check if a scan has been completed and if findings exist
             if (data.scan_completed) {
                 if (data.findings_exist) {
-                    // Show an alert indicating findings exist
+                    // Update alert icon to show active findings
+                    alertIcon.classList.remove('bi-bell');
+                    alertIcon.classList.add('bi-bell-fill', 'text-danger');
+
+                    // Optionally show an alert indicating findings exist
                     alert("A scan has completed and findings are available for review.");
                 } else {
                     // Alert for scan completion without findings
@@ -62,3 +65,11 @@ function checkScanAndAlert() {
 
 // Periodically check scan status and findings every 5 seconds
 setInterval(checkScanAndAlert, 5000);
+
+// Function to toggle theme between light, heimdall, and dark modes
+const themeToggle = document.getElementById('themeToggle');
+if (themeToggle) {
+    themeToggle.addEventListener('change', function() {
+        document.body.className = themeToggle.value + '-mode';
+    });
+}

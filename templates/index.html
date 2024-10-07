@@ -47,7 +47,7 @@
          {% if scan_completed %}
          <!-- View Scan Results Button if a scan has been performed -->
          <div class="container text-center mt-4">
-             <a href="./review.html" class="btn btn-primary w-50">View Scan Results</a>
+             <a href="./review" class="btn btn-primary w-50">View Scan Results</a>
          </div>
          {% endif %}
 
@@ -70,6 +70,7 @@
             <div id="file-system-form" class="tab-content active">  <!-- Set to active by default -->
                 <div class="container">
                     <form method="POST" enctype="multipart/form-data">
+                        <input type="hidden" name="scan_type" value="filesystem">
                         <div class="mb-3">
                             <label for="filesystem_input" class="form-label">File System Path:</label>
                             <input type="text" class="form-control" id="filesystem_input" name="filesystem_input" placeholder="Enter file system path">
@@ -80,38 +81,6 @@
                         </div>
                         <button type="submit" class="btn btn-primary w-100">Scan</button>
                     </form>
-
-                    <!-- Detailed Scan Results Section -->
-                    {% if file_scan_results %}
-                    <div class="card-footer mt-4">
-                        <h3 class="text-center">Scan Results:</h3>
-                        <table class="table table-hover scan-results-table">
-                            <thead class="table-dark">
-                                <tr>
-                                    <th>File/URL</th>
-                                    <th>Type</th>
-                                    <th>Severity</th>
-                                    <th>Details</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for result in file_scan_results %}
-                                <tr class="{% if 'critical' in result.severity|lower %}table-danger{% elif 'warning' in result.severity|lower %}table-warning{% else %}table-success{% endif %}">
-                                    <td>{{ result.path }}</td>
-                                    <td>{{ result.scan_type }}</td>
-                                    <td>{{ result.severity }}</td>
-                                    <td><button class="btn btn-link" data-bs-toggle="collapse" data-bs-target="#details-{{ loop.index }}">View Details</button></td>
-                                </tr>
-                                <tr id="details-{{ loop.index }}" class="collapse">
-                                    <td colspan="4"><pre>{{ result.details }}</pre></td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                    {% else %}
-                    <p class="mt-4">No scan results available.</p>
-                    {% endif %}                    
                 </div>
             </div>
 
@@ -119,44 +88,13 @@
             <div id="image-scan-form" class="tab-content">
                 <div class="container">
                     <form method="POST" enctype="multipart/form-data">
+                        <input type="hidden" name="scan_type" value="image">
                         <div class="mb-3">
                             <label for="image_name" class="form-label">Container Image Name:</label>
                             <input type="text" class="form-control" id="image_name" name="image_name" placeholder="example/image:tag">
                         </div>
                         <button type="submit" class="btn btn-primary w-100">Scan</button>
                     </form>
-
-                    <!-- Detailed Scan Results Section -->
-                    {% if image_scan_results %}
-                    <div class="card-footer mt-4">
-                        <h3 class="text-center">Scan Results:</h3>
-                        <table class="table table-hover scan-results-table">
-                            <thead class="table-dark">
-                                <tr>
-                                    <th>Image</th>
-                                    <th>Type</th>
-                                    <th>Severity</th>
-                                    <th>Details</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for result in image_scan_results %}
-                                <tr class="{% if 'critical' in result.severity|lower %}table-danger{% elif 'warning' in result.severity|lower %}table-warning{% else %}table-success{% endif %}">
-                                    <td>{{ result.path }}</td>
-                                    <td>{{ result.scan_type }}</td>
-                                    <td>{{ result.severity }}</td>
-                                    <td><button class="btn btn-link" data-bs-toggle="collapse" data-bs-target="#details-{{ loop.index }}">View Details</button></td>
-                                </tr>
-                                <tr id="details-{{ loop.index }}" class="collapse">
-                                    <td colspan="4"><pre>{{ result.details }}</pre></td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                    {% else %}
-                    <p class="mt-4">No scan results available.</p>
-                    {% endif %}                    
                 </div>
             </div>
 
@@ -164,44 +102,13 @@
             <div id="git-repo-form" class="tab-content">
                 <div class="container">
                     <form method="POST">
+                        <input type="hidden" name="scan_type" value="git">
                         <div class="mb-3">
                             <label for="git_repo_url" class="form-label">Git Repository URL:</label>
                             <input type="url" class="form-control" id="git_repo_url" name="git_repo_url" placeholder="https://github.com/user/repo.git">
                         </div>
                         <button type="submit" class="btn btn-primary w-100">Scan</button>
                     </form>
-
-                    <!-- Detailed Scan Results Section -->
-                    {% if git_scan_results %}
-                    <div class="card-footer mt-4">
-                        <h3 class="text-center">Scan Results:</h3>
-                        <table class="table table-hover scan-results-table">
-                            <thead class="table-dark">
-                                <tr>
-                                    <th>Repository</th>
-                                    <th>Type</th>
-                                    <th>Severity</th>
-                                    <th>Details</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for result in git_scan_results %}
-                                <tr class="{% if 'critical' in result.severity|lower %}table-danger{% elif 'warning' in result.severity|lower %}table-warning{% else %}table-success{% endif %}">
-                                    <td>{{ result.path }}</td>
-                                    <td>{{ result.scan_type }}</td>
-                                    <td>{{ result.severity }}</td>
-                                    <td><button class="btn btn-link" data-bs-toggle="collapse" data-bs-target="#details-{{ loop.index }}">View Details</button></td>
-                                </tr>
-                                <tr id="details-{{ loop.index }}" class="collapse">
-                                    <td colspan="4"><pre>{{ result.details }}</pre></td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                    {% else %}
-                    <p class="mt-4">No scan results available.</p>
-                    {% endif %}
                 </div>
             </div>
         </div>
