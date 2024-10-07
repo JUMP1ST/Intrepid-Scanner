@@ -2,6 +2,7 @@ import os
 import logging
 from flask import Flask, request, render_template, redirect, url_for, jsonify
 from werkzeug.utils import secure_filename
+import shutil
 
 # Import scanning and review functions
 from scanners.file_scanner import scan_file_system
@@ -21,11 +22,8 @@ app.secret_key = 'supersecretkey'  # Set a secure key for sessions
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['SCAN_RESULTS_FOLDER'], exist_ok=True)
 
-scan_completed = False  # Track scan status
-
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    global scan_completed  # Use the global scan_completed to track status
     file_scan_results = []
     image_scan_results = []
     git_scan_results = []
@@ -39,82 +37,41 @@ def index():
         # Process filesystem scan
         if scan_type == 'filesystem':
             for file in files:
-                filename = secure_filename(file.filename)
-                if not filename:
-                    logger.error("No filename provided for file upload.")
-                    file_scan_results.append("Error: No valid filename provided.")
-                    continue
-
-                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
                 try:
-                    file.save(file_path)
+                    file_path = save_file_to_upload_folder(file)
                     logger.info(f"File saved to {file_path}")
-                except Exception as e:
-                    logger.error(f"Failed to save file: {e}")
-                    file_scan_results.append(f"Error saving file {filename}: {e}")
-                    continue
 
-                try:
-                    file_type = detect_file_type(file_path)
-                except Exception as e:
-                    file_scan_results.append(f"Error detecting file type: {e}")
-                    continue
+                    # Perform the filesystem scan
+                    full_scan_result = scan_file_system(file_path)
+                    file_scan_results.append(format_scan_result(full_scan_result, 'filesystem'))
 
-                # Perform the filesystem scan
-                full_scan_result = run_trivy_fs_scan(file_path)
-                file_scan_results.append(format_scan_result(full_scan_result, 'filesystem'))
+                except Exception as e:
+                    logger.error(f"Failed to process file: {e}")
+                    file_scan_results.append(f"Error processing file {file.filename}: {e}")
 
         # Process Git repository scan
         elif scan_type == 'git' and git_repo_url:
             try:
-                logger.info(f"Running Trivy remote Git scan on: {git_repo_url}")
-                trivy_repo_result = run_trivy_repo_scan(git_repo_url)
-                git_scan_results.append(format_scan_result(trivy_repo_result, 'git'))
-                logger.info(f"Git repository scan completed for: {git_repo_url}")
+                git_scan_results.append(scan_git_repository(git_repo_url))
             except Exception as e:
-                git_scan_results.append({'error': f"Error running Trivy Git scan: {e}"})
-
-            # Clone the repo and run further scans
-            clone_path = os.path.join(app.config['UPLOAD_FOLDER'], 'cloned_repo')
-            if clone_git_repo(git_repo_url, clone_path):
-                git_scan_results.extend(run_clamav_scan(clone_path))
-                git_scan_results.append(run_yara_scan(clone_path))
-                trivy_scan_result = run_trivy_scan(
-                    ['trivy', 'fs', clone_path, '--format', 'json'],
-                    os.path.join(app.config['SCAN_RESULTS_FOLDER'], 'trivy_fs_scan.json')
-                )
-                git_scan_results.append(format_scan_result(trivy_scan_result, 'filesystem'))
-                shutil.rmtree(clone_path)
+                git_scan_results.append({'error': f"Error running Git scan: {e}"})
 
         # Process image scan
         elif scan_type == 'image' and image_name:
-            scan_tasks = [
-                lambda: run_trivy_image_scan(image_name),
-                lambda: run_grype_image_scan(image_name),
-                lambda: run_clamav_docker_image_scan(image_name)
-            ]
+            try:
+                image_scan_results.append(scan_docker_image(image_name))
+            except Exception as e:
+                image_scan_results.append({'error': f"Error scanning Docker image: {e}"})
 
-            clamav_path = f'/var/lib/docker/images/{image_name}'
-            if os.path.exists(clamav_path):
-                scan_tasks.append(lambda: run_clamav_scan(clamav_path))
-
-            # Execute scan tasks and collect results
-            image_scan_results.extend(perform_scan_tasks(scan_tasks))
-
-        # Format and pass scan results to template
-        formatted_file_results = [format_scan_result(result, 'filesystem') for result in file_scan_results]
-        formatted_image_results = [format_scan_result(result, 'image') for result in image_scan_results]
-        formatted_git_results = [format_scan_result(result, 'git') for result in git_scan_results]
-
-        # Pass all results to the index template
+        # Pass scan results to the template
         return render_template(
             'index.html',
-            file_scan_results=formatted_file_results,
-            image_scan_results=formatted_image_results,
-            git_scan_results=formatted_git_results
+            file_scan_results=file_scan_results,
+            image_scan_results=image_scan_results,
+            git_scan_results=git_scan_results
         )
 
-    # If not POST, render the default template
+    # Render default template for GET request
     return render_template('index.html')
 
 
@@ -125,6 +82,7 @@ def save_file_to_upload_folder(file):
     file.save(file_path)
     logger.info(f"File saved to {file_path}")
     return file_path
+
 
 @app.route('/review')
 def review():
