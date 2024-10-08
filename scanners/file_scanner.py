@@ -8,6 +8,10 @@ def scan_file_system(file_path):
     """Perform scans on a file system path using different tools."""
     results = []
 
+    # Ensure the path exists
+    if not os.path.exists(file_path):
+        return [{"error": "File Path does not exisit." }]
+
     # Run the Trivy scan
     trivy_result = run_trivy_fs_scan(file_path)
     results.append(trivy_result)
