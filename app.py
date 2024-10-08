@@ -3,7 +3,7 @@ import shutil
 import logging
 from flask import Flask, request, render_template, jsonify
 from werkzeug.utils import secure_filename
-import subprocess
+
 
 # Import scanning and review functions
 from scanners.file_scanner import scan_file_system
