@@ -1,8 +1,9 @@
 import os
 from shutil import rmtree
 from git import Repo
+import subprocess
 from .tools.trivy import run_trivy_repo_scan
-from .tools.clamav import run_clamav_fs_scan
+from .tools.clamav import run_clamav_scan
 
 def scan_git_repository(repo_url):
     # Clone a Git repository and run file system scans.
@@ -19,7 +20,7 @@ def scan_git_repository(repo_url):
 
     # Step 2: Run local Trivy and ClamAV scans on the cloned repo
     scan_results.append(run_trivy_repo_scan(repo_path))
-    scan_results.append(run_clamav_fs_scan(repo_path))
+    scan_results.append(run_clamav_scan(repo_path))
 
     # Clean up
     rmtree(repo_path, ignore_errors=True)

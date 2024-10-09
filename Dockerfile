@@ -44,6 +44,9 @@ RUN ln -s /usr/bin/clamscan /usr/local/bin/clamscan
 # Explicitly create necessary directories
 RUN mkdir -p /app/uploads /app/output/scan-results /opt/yara
 
+# Clone YARA rules repository into /opt/yara
+RUN git clone https://github.com/Yara-Rules/rules.git /opt/yara
+
 # Copy requirements.txt and install dependencies
 COPY requirements.txt ./
 RUN python3 -m venv /app/venv && \
@@ -55,9 +58,6 @@ RUN curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/
 
 # Install Grype
 RUN curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
-
-# Install YARA rules
-RUN curl -o /opt/yara/malware_index.yar https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/malware_index.yar
 
 # Set permissions for /app directories
 RUN chown -R root:root /app
@@ -81,7 +81,7 @@ ENV PATH="/app/venv/bin:$PATH" \
     UPLOAD_FOLDER=/app/uploads \
     SCAN_RESULTS_FOLDER=/app/output/scan-results \
     PYTHONUNBUFFERED=1 \
-    YARA_RULES_PATH="/opt/yara/malware_index.yar" \
+    YARA_RULES_PATH="/opt/yara" \
     FLASK_APP=app.py
 
 # Ensure the production stage uses the root user
@@ -98,6 +98,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+
+# Ensure ClamAV uses the correct socket
+RUN mkdir -p /var/run/clamav && \
+    chown clamav:clamav /var/run/clamav && \
+    chmod 755 /var/run/clamav && \
+    echo "LocalSocket /var/run/clamav/clamd.ctl" >> /etc/clamav/clamd.conf
+
+# Ensure ClamAV virus database is kept up to date with Freshclam
+RUN freshclam
 
 # Create symbolic link for clamscan in production stage if not available in PATH
 RUN ln -s /usr/bin/clamscan /usr/local/bin/clamscan
@@ -118,5 +127,5 @@ RUN ln -s /usr/lib/x86_64-linux-gnu/libmagic.so.1 /usr/lib/libmagic.so && \
 # Expose the application port
 EXPOSE 5000
 
-# Correct the CMD to explicitly run app.py using Python
-CMD ["python3", "/app/app.py"]
+# Run ClamAV as a background daemon and start the Flask application
+CMD ["sh", "-c", "clamd & python3 /app/app.py"]
