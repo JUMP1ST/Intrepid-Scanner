@@ -1,114 +1,112 @@
-# Use Ubuntu as the base image for a more flexible environment
-FROM ubuntu:22.04 AS builder
-
-# Set environment variables
-ENV PATH="/app/venv/bin:$PATH" \
-    DEBIAN_FRONTEND=noninteractive \
-    UPLOAD_FOLDER=/app/uploads \
-    SCAN_RESULTS_FOLDER=/app/output/scan-results \
-    PYTHONUNBUFFERED=1
-
-# Create app directory
-WORKDIR /app
-
-# Ensure the build uses the root user
-USER root
-
-# Install system dependencies including Python, libmagic, and development libraries
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 \
-    python3-pip \
-    python3-venv \
-    python3-dev \
-    libmagic1 \
-    libmagic-dev \
-    curl \
-    git \
-    tar \
-    yara \
-    clamav \
-    build-essential \
-    libssl-dev \
-    libffi-dev \
-    file \
-    gcc \
-    clamav-daemon \
-    docker.io && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* && \
-    freshclam
-
-# Explicitly create necessary directories
-RUN mkdir -p /app/uploads /app/output/scan-results
-
-# Copy requirements.txt and install dependencies
-COPY requirements.txt ./
-RUN python3 -m venv /app/venv && \
-    /app/venv/bin/pip install --upgrade pip && \
-    /app/venv/bin/pip install --no-cache-dir -r requirements.txt
-
-# Install Trivy
-RUN curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
-
-# Install Grype
-RUN curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
-
-# Install YARA rules
-RUN mkdir -p /opt/yara && \
-    curl -o /opt/yara/malware_index.yar https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/malware_index.yar
-
-# Set permissions for /app directories
-RUN chown -R root:root /app
-
-# Copy the application code and static files
-COPY app.py ./ 
-COPY scanners/ ./scanners/   
-COPY review_manager/ ./review_manager/    
-COPY templates/ ./templates/
-COPY static/ ./static/
-
-
-# Stage 2: Production stage using the same Ubuntu base image
-FROM ubuntu:22.04
-
-# Ensure output and upload directories exist
-RUN mkdir -p /app/output /app/uploads /app/output/scan-results && \
-    chown -R root:root /app
+# -----------------------------
+# Stage 1: Builder Stage
+# -----------------------------
+FROM python:3.11-slim AS builder
 
 # Set environment variables
 ENV PATH="/app/venv/bin:$PATH" \
     UPLOAD_FOLDER=/app/uploads \
     SCAN_RESULTS_FOLDER=/app/output/scan-results \
     PYTHONUNBUFFERED=1 \
-    YARA_RULES_PATH="/opt/yara/malware_index.yar" \
-    FLASK_APP=app.py
+    GIT_PYTHON_REFRESH=quiet
 
-# Ensure the production stage uses the root user
-USER root
+# Create the application directory
+WORKDIR /app
 
-# Install Python and essential tools in the production stage
+# Install necessary system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 \
-    python3-venv \
+    curl \
+    gcc \
+    build-essential \
+    git \
     libmagic1 \
-    && apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    libmagic-dev \
+    yara \
+    clamav clamav-daemon \
+    docker.io \
+    libssl-dev openssl && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* && \
+    freshclam
 
-# Copy the virtual environment, Docker CLI, and application code from the builder stage
+# Install Trivy, Grype, and Syft
+RUN curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin && \
+    curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin && \
+    curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+
+# Clone YARA rules repository
+RUN mkdir -p /opt/yara && \
+    git clone https://github.com/Yara-Rules/rules.git /opt/yara
+
+# Install Python dependencies in a virtual environment
+COPY requirements.txt .
+RUN python3 -m venv /app/venv && \
+    /app/venv/bin/pip install --upgrade pip && \
+    /app/venv/bin/pip install --no-cache-dir -r requirements.txt
+
+# Set permissions for application directories
+RUN mkdir -p /app/uploads /app/output/scan-results && \
+    chown -R root:root /app
+
+# Copy application code
+COPY . /app
+COPY static /app/static
+COPY templates /app/templates
+
+# -----------------------------
+# Stage 2: Production Stage
+# -----------------------------
+FROM python:3.11-slim
+
+# Set environment variables
+ENV PATH="/app/venv/bin:$PATH" \
+    UPLOAD_FOLDER=/app/uploads \
+    SCAN_RESULTS_FOLDER=/app/output/scan-results \
+    PYTHONUNBUFFERED=1 \
+    YARA_RULES_PATH="/opt/yara" \
+    GIT_PYTHON_REFRESH=quiet
+
+# Create necessary directories and set permissions
+RUN mkdir -p /app/output /app/uploads /app/output/scan-results && \
+    chown -R root:root /app
+
+# Install runtime dependencies including git
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    libmagic1 \
+    clamav clamav-daemon && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* && \
+    freshclam
+
+# Configure ClamAV
+RUN mkdir -p /var/run/clamav && \
+    chown clamav:clamav /var/run/clamav && \
+    chmod 755 /var/run/clamav && \
+    echo "LocalSocket /var/run/clamav/clamd.ctl" >> /etc/clamav/clamd.conf
+
+# Copy necessary files from builder stage
 COPY --from=builder /app /app
 COPY --from=builder /usr/local/bin/trivy /usr/local/bin/trivy
 COPY --from=builder /usr/local/bin/grype /usr/local/bin/grype
+COPY --from=builder /usr/local/bin/syft /usr/local/bin/syft
 COPY --from=builder /opt/yara /opt/yara
+
+# Verify installations
+RUN git --version && trivy --version && grype version && syft version
 
 # Set working directory
 WORKDIR /app
 
-# Fix the linking issue with libmagic
-RUN ln -s /usr/lib/x86_64-linux-gnu/libmagic.so.1 /usr/lib/libmagic.so && \
-    ldconfig  # Update shared library cache
-
 # Expose the application port
-EXPOSE 5000
+EXPOSE 8000
 
-# Correct the CMD to explicitly run app.py using Python
-CMD ["python3", "/app/app.py"]
+# Define volumes for persistence
+VOLUME ["/app/uploads", "/app/output/scan-results"]
+
+# Add health check for FastAPI and ClamAV
+HEALTHCHECK --interval=30s --timeout=10s \
+    CMD curl -f http://localhost:8000/ || exit 1
+
+# Start ClamAV daemon and FastAPI app using Uvicorn
+CMD ["sh", "-c", "clamd & uvicorn app:app --host 0.0.0.0 --port 8000"]
