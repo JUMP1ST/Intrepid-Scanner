@@ -1,113 +1,141 @@
 import os
-import logging
-from flask import Flask, request, render_template, redirect, url_for, jsonify
-from werkzeug.utils import secure_filename
 import shutil
+import logging
+import aiofiles
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+from starlette.requests import Request
+from starlette.staticfiles import StaticFiles
 
-# Import scanning and review functions
-from scanners.file_scanner import scan_file_system
-from scanners.image_scanner import scan_docker_image
-from scanners.git_scanner import scan_git_repository
-from review_manager.review_manager import get_review_data, mark_review_item_reviewed, delete_review_item
+from scanners.trivy_fs_scanner import run_trivy_fs_scan
+from scanners.trivy_image_scanner import run_trivy_image_scan
+from scanners.trivy_repo_scanner import run_trivy_repo_scan
+from scanners.clone_and_local_scan import scan_git_repository
+from scanners.clamav_scanner import run_clamav_fs_scan
+from scanners.grype_scanner import run_grype_image_scan
+from scanners.syft_scanner import run_syft_sbom_scan
+from scanners.yara_scanner import run_yara_scan
+from utils.extract import extract_files
+from utils.rezip import zip_directory
 
-# Setup logging
-logging.basicConfig(level=logging.INFO)
+# --- Logging Setup ---
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = os.getenv('UPLOAD_FOLDER', '/tmp/uploads')
-app.config['SCAN_RESULTS_FOLDER'] = os.getenv('SCAN_RESULTS_FOLDER', '/tmp/scan-results')
-app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024 * 1024  # 5GB max file size
-app.secret_key = 'supersecretkey'  # Set a secure key for sessions
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-os.makedirs(app.config['SCAN_RESULTS_FOLDER'], exist_ok=True)
+# --- Configuration ---
+UPLOAD_FOLDER = "/app/uploads"
+SCAN_RESULTS_FOLDER = "/app/scan-results"
+YARA_RULES_FOLDER = "/app/yara_rules"
+CLAMAV_SOCKET_DIR = "/var/run/clamav"
 
-@app.route('/', methods=['GET', 'POST'])
-def index():
-    file_scan_results = []
-    image_scan_results = []
-    git_scan_results = []
+def ensure_directories():
+    """Ensure necessary directories exist."""
+    try:
+        os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+        os.makedirs(SCAN_RESULTS_FOLDER, exist_ok=True)
+        os.makedirs(YARA_RULES_FOLDER, exist_ok=True)
+        os.makedirs(CLAMAV_SOCKET_DIR, exist_ok=True)
+        logger.info("All directories created successfully.")
+    except Exception as e:
+        logger.error(f"Directory creation failed: {e}")
+        raise
 
-    if request.method == 'POST':
-        scan_type = request.form.get('scan_type')
-        image_name = request.form.get('image_name')
-        git_repo_url = request.form.get('git_url')
-        files = request.files.getlist('file')
+# Ensure directories are created
+ensure_directories()
 
-        # Process filesystem scan
-        if scan_type == 'filesystem':
-            for file in files:
-                try:
-                    file_path = save_file_to_upload_folder(file)
-                    logger.info(f"File saved to {file_path}")
+# --- FastAPI App Setup ---
+app = FastAPI()
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
 
-                    # Perform the filesystem scan
-                    full_scan_result = scan_file_system(file_path)
-                    file_scan_results.append(format_scan_result(full_scan_result, 'filesystem'))
+@app.get("/", response_class=HTMLResponse)
+async def get_index(request: Request):
+    """Render the index page."""
+    return templates.TemplateResponse("index.html", {"request": request, "scan_results": []})
 
-                except Exception as e:
-                    logger.error(f"Failed to process file: {e}")
-                    file_scan_results.append(f"Error processing file {file.filename}: {e}")
+@app.post("/scan/", response_class=HTMLResponse)
+async def scan_file(
+    request: Request,
+    scan_type: str = Form(...),
+    file: UploadFile = File(None),
+    image_name: str = Form(None),
+    repo_url: str = Form(None),
+):
+    """Handle scan requests."""
+    scan_results = []
 
-        # Process Git repository scan
-        elif scan_type == 'git' and git_repo_url:
-            try:
-                git_scan_results.append(scan_git_repository(git_repo_url))
-            except Exception as e:
-                git_scan_results.append({'error': f"Error running Git scan: {e}"})
+    try:
+        if scan_type == "filesystem" and file:
+            scan_results = await handle_filesystem_scan(file)
+        elif scan_type == "image" and image_name:
+            scan_results = await handle_image_scan(image_name)
+        elif scan_type == "repo" and repo_url:
+            scan_results = await handle_repo_scan(repo_url)
+        else:
+            raise HTTPException(status_code=400, detail="Invalid scan type or missing parameters.")
+    except Exception as e:
+        logger.error(f"Scan failed: {e}")
+        raise HTTPException(status_code=500, detail="Scan failed.")
+    return templates.TemplateResponse("scan.html", {"request": request, "scan_results": scan_results})
 
-        # Process image scan
-        elif scan_type == 'image' and image_name:
-            try:
-                image_scan_results.append(scan_docker_image(image_name))
-            except Exception as e:
-                image_scan_results.append({'error': f"Error scanning Docker image: {e}"})
+# --- Helper Functions ---
+async def handle_filesystem_scan(file: UploadFile):
+    """Perform filesystem scans."""
+    file_path = os.path.join(UPLOAD_FOLDER, file.filename)
+    extract_path = os.path.join(UPLOAD_FOLDER, "extracted")
+    results = []
 
-        # Pass scan results to the template
-        return render_template(
-            'index.html',
-            file_scan_results=file_scan_results,
-            image_scan_results=image_scan_results,
-            git_scan_results=git_scan_results
-        )
+    try:
+        # Save uploaded file
+        async with aiofiles.open(file_path, "wb") as f:
+            await f.write(await file.read())
 
-    # Render default template for GET request
-    return render_template('index.html')
+        os.makedirs(extract_path, exist_ok=True)
+        if extract_files(file_path, extract_path):
+            # Run filesystem scans
+            results.append(await run_trivy_fs_scan(extract_path))
+            results.append(await run_yara_scan(extract_path))
+            results.append(await run_clamav_fs_scan(extract_path))
+
+            # Re-zip scanned files
+            zip_file_path = os.path.join(UPLOAD_FOLDER, f"{file.filename}_scanned.zip")
+            zip_directory(extract_path, zip_file_path)
+            results.append({"path": zip_file_path, "scan_type": "Re-zipped Archive", "details": "Re-zipped after scan."})
+
+        # Cleanup temporary files
+        shutil.rmtree(extract_path)
+        os.remove(file_path)
+    except Exception as e:
+        logger.error(f"Filesystem scan error: {e}")
+        raise HTTPException(status_code=500, detail="Filesystem scan error.")
+    return results
+
+async def handle_image_scan(image_name: str):
+    """Perform image scans."""
+    try:
+        return [
+            await run_trivy_image_scan(image_name),
+            await run_grype_image_scan(image_name),
+            await run_syft_sbom_scan(image_name),
+        ]
+    except Exception as e:
+        logger.error(f"Image scan error: {e}")
+        raise HTTPException(status_code=500, detail="Image scan error.")
+
+async def handle_repo_scan(repo_url: str):
+    """Perform repository scans."""
+    try:
+        # Perform repository scans
+        logger.info(f"Starting repository scan for: {repo_url}")
+        results = await scan_git_repository(repo_url)  # Ensure the coroutine is awaited
+        return results
+    except Exception as e:
+        logger.error(f"Repository scan error: {e}")
+        raise HTTPException(status_code=500, detail="Repository scan error.")
 
 
-def save_file_to_upload_folder(file):
-    """Save an uploaded file to the upload directory."""
-    filename = secure_filename(file.filename)
-    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    file.save(file_path)
-    logger.info(f"File saved to {file_path}")
-    return file_path
-
-
-@app.route('/review')
-def review():
-    """Display flagged scan results for manual review."""
-    review_data = get_review_data()
-    return render_template('review.html', review_data=review_data)
-
-@app.route('/mark_reviewed/<int:index>', methods=['POST'])
-def mark_reviewed(index):
-    """Mark a review item as reviewed."""
-    success, message = mark_review_item_reviewed(index)
-    if success:
-        return jsonify({'message': 'Marked as reviewed'}), 200
-    else:
-        return jsonify({'error': message}), 500
-
-@app.route('/delete_review/<int:index>', methods=['POST'])
-def delete_review(index):
-    """Delete a review item."""
-    success, message = delete_review_item(index)
-    if success:
-        return jsonify({'message': 'Entry deleted'}), 200
-    else:
-        return jsonify({'error': message}), 500
-
+# --- Main ---
 if __name__ == "__main__":
-    logger.info("Starting Flask application on http://0.0.0.0:5000")
-    app.run(host='0.0.0.0', port=5000)
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
